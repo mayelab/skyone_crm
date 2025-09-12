@@ -1,0 +1,810 @@
+---
+title: ""
+description: Enhance communication with interactive visualizations 
+base_url: https://placeanalyzer.com.py
+preview: https://place-storage.nyc3.digitaloceanspaces.com/skyone/fotos-inmo/skyone_inmueble_0000000006-01-small.jpg
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Vignette Title}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+params: 
+  inmo: NA
+  agente: NA
+  tipologias: NA
+  info: NA
+---
+
+
+```{r style, echo = FALSE, warning=FALSE}
+
+if(params$info){
+                      tags$style(type = "text/css", paste0("
+                                  .btn-group:after {display: table;}
+                      "))
+                                  
+                      tags$style(type = "text/css", paste0("
+                                  body {background: url('https://place-storage.nyc3.digitaloceanspaces.com/skyone/skyone_logo_blanco.png'), 
+  linear-gradient(to bottom, #31426c, 70%, #fed3a3);
+  background-repeat: no-repeat, no-repeat;
+  background-size: 100px, 100%;
+  background-position: center top 20px, top;}
+                                  "))
+}else{
+                        tags$style(type = "text/css", paste0("
+                                  body {background: 
+  linear-gradient(to bottom, #60625f, 70%, #d1d3cf);
+  background-repeat: no-repeat;
+  background-size: 100%;}
+                                  "))
+}
+
+```
+
+
+```{r setup, include = FALSE, echo = FALSE, warning=FALSE}
+
+company <- "SkyOne"
+co <- str_to_lower(company)
+main_color <- "#0f2b68"
+
+load_mysql <- function(table, ext_conn = FALSE, conn = NA){
+  if(ext_conn == FALSE){
+    conn <- dbConnect(MySQL(), dbname = options()$mysql$databaseName, host = options()$mysql$host, 
+                      port = options()$mysql$port, user = options()$mysql$user, 
+                      password = options()$mysql$password)
+  }
+  
+  query <- sprintf("SELECT * FROM %s", table)
+  data <- dbGetQuery(conn, "SET NAMES 'utf8mb4'")
+  data <- dbGetQuery(conn, query)
+  if(ext_conn == FALSE){
+    dbDisconnect(conn)
+  }
+  if(nrow(data) != 0){
+    if(nrow(data) == 1){
+      data <- rbind(data, data)
+      one_row <- TRUE
+    }else{
+      one_row <- FALSE
+    }
+    for(i in 1:ncol(data)){
+      if(class(data[,i]) == "character"){
+        data[,i] <- str_replace_all(data[,i], "U\\+0027", "'") %>% data.frame()
+      }
+    }
+    data <- data %>% mutate_all(~replace(., . == "NA", NA))
+    if(one_row == TRUE){data <- data[1,]}
+    if("geometry" %in% colnames(data)){
+      data <- st_as_sf(data, wkt = "geometry", crs = crs)
+    }
+  }
+  data
+}
+
+list_spaces_do <- function(prefix = NULL, delimiter = NULL, max = 1000){
+  query <- list(prefix = prefix, delimiter = delimiter, "max-keys" = NULL, marker = NULL)
+  r <- aws.s3::s3HTTP(verb = "GET",
+                      query = query,
+                      region = options()$digOcean$spaces_base,
+                      key = options()$digOcean$spaces_key,
+                      secret = options()$digOcean$spaces_secret,
+                      base_url = options()$digOcean$spaces_region,
+                      headers = list(`x-amz-acl` = "public-read"))
+
+  query_2 <- list(prefix = prefix, delimiter = delimiter, "max-keys" = max, marker = tail(r, 1)[["Contents"]][["Key"]])
+  extra <- aws.s3::s3HTTP(verb = "GET",
+                          query = query_2,
+                          parse_response = TRUE,
+                          region = options()$digOcean$spaces_base,
+                          key = options()$digOcean$spaces_key,
+                          secret = options()$digOcean$spaces_secret,
+                          base_url = options()$digOcean$spaces_region,
+                          headers = list(`x-amz-acl` = "public-read"))
+  
+  new_r <- c(r, tail(extra, -5))
+  new_r[["MaxKeys"]] <- as.character(extra[["MaxKeys"]])
+  new_r[["IsTruncated"]] <- extra[["IsTruncated"]]
+  attr(new_r, "x-amz-id-2") <- attr(r, "x-amz-id-2")
+  attr(new_r, "x-amz-request-id") <- attr(r, "x-amz-request-id")
+  attr(new_r, "date") <- attr(r, "date")
+  attr(new_r, "x-amz-bucket-region") <- attr(r, "x-amz-bucket-region")
+  attr(new_r, "content-type") <- attr(r, "content-type")
+  attr(new_r, "transfer-encoding") <- attr(r, "transfer-encoding")
+  attr(new_r, "server") <- attr(r, "server")
+  r <- new_r
+  
+  for (i in which(names(r) == "Contents")) {
+    r[[i]][["Size"]] <- as.numeric(r[[i]][["Size"]])
+    attr(r[[i]], "class") <- "s3_object"
+  }
+  att <- r[names(r) != "Contents"]
+  r[names(r) != "Contents"] <- NULL
+  
+  # collapse CommonPrefixes elements
+  cp <- att[names(att) == "CommonPrefixes"]
+  att[names(att) == "CommonPrefixes"] <- NULL
+  att[["CommonPrefixes"]] <- as.character(cp)
+
+  out <- structure(r, class = "s3_bucket")
+  attributes(out) <- c(attributes(out), att)
+  if(length(out) > 0){
+    out$Contents$Bucket <- NA
+    dat <- as.data.frame(out)
+    dat <- dat %>% select(Key, LastModified, Size) %>% 
+      mutate(Type = ifelse(str_ends(Key, "/"), "dir", "file"),
+             Order = str_count(Key, "/"))
+    dat <- dat[!duplicated(dat$Key),]
+  }else{
+    dat <- structure(list(Key = character(0),
+                          LastModified = character(0),
+                          Size = character(0),
+                          Type = character(0),
+                          Order = character(0)),
+                     class = "data.frame",
+                     row.names = character(0))
+  }
+  return(dat)
+}
+
+
+
+
+
+
+#source(paste0(getwd(), "global.R"), local = TRUE)
+inmo <- params$inmo
+    if(inmo$moneda_contrato == "GS" & inmo$venta_alquiler == "Venta"){
+      inmo$precio <- round(inmo$precio/1000000)
+    }
+agente <- params$agente
+tipologias <- params$tipologias
+
+meta() %>%
+      meta_social(
+        title = str_trunc(inmo$titulo, 60),
+        description = str_trunc(inmo$descripcion, 120),
+        url = "https://www.skyone.com.py",
+        image = inmo$img
+) %>% include_meta()
+
+  skyone_marker <- makeIcon(
+    iconUrl = "www/skyone_marker.png",
+    iconWidth = 60, iconHeight = 60,
+    iconAnchorX = 30, iconAnchorY = 60
+  )
+    
+    agencias <- load_mysql(paste0(co, "_agencias_data"))
+    franquicias <- load_mysql(paste0(co, "_franquicias_data"))
+      if(agente$agencia == "Global Master Office"){
+        agencia_name <- "Global Master Office"
+      }else{
+        if(agente$agencia %in% agencias$id){
+          agencia_name <- agencias$name[agencias$id == agente$agencia]
+        }else{
+          if(agente$agencia %in% franquicias$id){
+          agencia_name <- franquicias$name[franquicias$id == agente$agencia]
+        }
+      }
+    }
+    
+    if(inmo$tipoPropiedad == "Proyecto"){
+      tipologias <- tipologias %>% arrange(fecha)
+      if(inmo$moneda_contrato == "GS" & inmo$venta_alquiler == "Venta"){
+          tipologias$precio <- round(tipologias$precio/1000000)
+      }
+      
+      precio_min <- format(min(tipologias$precio), big.mark = ".", decimal.mark = ",", scientific = FALSE)
+      precio_max <- format(max(tipologias$precio), big.mark = ".", decimal.mark = ",", scientific = FALSE)
+      dormitorios_min <- min(ifelse(is.na(as.integer(tipologias$dormitorios)), 1, as.integer(tipologias$dormitorios)))
+      dormitorios_max <- max(ifelse(is.na(as.integer(tipologias$dormitorios)), 1, as.integer(tipologias$dormitorios)))
+      banios_min <- min(as.integer(tipologias$banios))
+      banios_max <- max(as.integer(tipologias$banios))
+      m2_cons_min <- format(min(tipologias$m2_cons), big.mark = ".", decimal.mark = ",", scientific = FALSE)
+      m2_cons_max <- format(max(tipologias$m2_cons), big.mark = ".", decimal.mark = ",", scientific = FALSE)
+      garajes_min <- min(as.integer(tipologias$garajes))
+      garajes_max <- max(as.integer(tipologias$garajes))
+      bauleras_min <- min(as.integer(tipologias$bauleras))
+      bauleras_max <- max(as.integer(tipologias$bauleras))
+
+        boxes <- list()        
+        for(i in 1:nrow(tipologias)){
+        tipo <- tipologias[i,]
+        boxes[[i]] <- div(style = "display:inline-block", 
+            div(style = "position: absolute; margin-top: 171px; margin-left: 20px; width: 195px; line-height: 1.2;",
+                HTML(paste0("<p><span style='font-size: 130%; font-weight: normal; color: #777777; height: 45px;'>", 
+                            tipo$titulo, "</span></p>"))
+            ),
+            if(tipo$precio != 0){
+              div(style = "position: absolute; margin-top: 221px; margin-left: 20px",
+                  h4(paste0(tipo$moneda_contrato, " ", format(tipo$precio, big.mark = ".", decimal.mark = ",", scientific = FALSE), 
+                            ifelse(tipo$moneda_contrato == "GS" & tipo$venta_alquiler == "Venta", " millones", "")), 
+                     style = paste0("font-weight: lighter; font-size: 180%;color: ", lighten(main_color, 0.20)))
+              )
+            }else{
+              div(style = "position: absolute; margin-top: 226px; margin-left: 20px",
+                  h4(" ", style = paste0("font-weight: lighter; font-size: 170%;color: ", lighten(main_color, 0.20)))
+              )
+            },
+            div(style = "position: absolute; margin-top: 266px; margin-left: 20px",
+                HTML(paste0("<p><span style='font-size: 100%; font-weight: normal; color: #777777'>
+                              <i class='fa fa-bed'></i> ", ifelse(tipo$dormitorios == "Monoambiente", "M", tipo$dormitorios),
+                            "  <i class='fa fa-bath'></i> ", tipo$banios,    
+                            "  <i class='fa fa-ruler-combined'></i> ", tipo$m2_cons, "m2",
+                            "  <i class='fa fa-car-side'></i> ", tipo$garajes,   
+                            "  <i class='fa fa-suitcase'></i> ", tipo$bauleras,
+                            "</span></p>"))
+            ),
+            div(style = "position: absolute; margin-top: 286px; margin-left: 20px",
+                HTML(paste0("<p><span style='font-size: 100%; font-weight: normal; color: #777777'>",
+                            if(tipo$balcon == "si") "Balcón   ",
+                            if(tipo$parrilla == "si") "Parrilla   ",
+                            if(tipo$area_servicio == "si") "Area servicio   ",
+                            "</span></p>")) 
+            ),
+            div(style = paste0("border-style: solid; border-width: 1px; border-color: ", main_color, "; 
+                       border-radius: 10px; background-color: white; width: 210px; height: 306px;
+                                 margin: 10px; padding: 0px"),
+                div(actionButton("nada", NULL, style = paste0('background-color: transparent;
+                                                             border: 0px; width:208px; height: 156px; margin: 0px;
+                                                             background-image: url("', tipo$img, '");
+                                                             background-size: cover, 208px 156px;
+                                                             border-radius: 8px 8px 0px 0px')),
+                )
+            )
+        )
+        }
+    }
+
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+
+
+```
+
+```{r titulo, echo = FALSE, warning=FALSE}
+  if(params$info){
+div(
+  br(),
+  br(),
+  HTML(paste0("<p><span style='font-size: 180%; font-weight: bold; color: #eeeeee'>", 
+                      str_to_upper(inmo$titulo), "</span></p>")), align = "center")
+  }
+```
+
+```{r caracteristicas_agente, echo = FALSE, warning=FALSE}
+div(align = "center",
+    if(params$info){
+fluidRow(style = "padding: 0px",
+         column(6, style = "width: 325px; padding: 0px; margin: 5px;",
+                fluidPage(style = paste0("border-style: solid; border-width: 1px; border-color: #aaaaaa; 
+                       border-radius: 10px; background-color: white; padding: 10px; min-height: 230px; margin: 0px;"),
+                          div(style = "padding: 0px", align = "left",
+                              div(
+                                div(style = "padding: 0px; position: absolute; margin-top: 0px; margin-left: 0px",
+                                    HTML(paste0("<p><span style='font-size: 120%; font-weight: normal; color: #888888'>", 
+                                                inmo$tipoPropiedad, " en ", inmo$venta_alquiler, "</span></p>")),
+                                ),
+                                div(style = "padding: 0px; position: absolute; margin-top: 0px; margin-left: 220px",
+                                    HTML(paste0("<p><span style='font-size: 120%; font-weight: bold; color: #888888'>", 
+                                                "ID: ", as.integer(str_flatten(str_extract_all(inmo$id, "\\d")[[1]])))),
+                                )
+                              ),
+                              if(inmo$tipoPropiedad == "Proyecto"){
+                                if(precio_min == precio_max){
+                                  div(style = "position: absolute; margin-left: 0px; margin-top: 30px",
+                                      HTML(paste0("<p><span style='font-size: 190%; font-weight: lighter; color: ", main_color, "'>", 
+                                                  inmo$moneda_contrato, " ", precio_min, 
+                                                  ifelse(inmo$moneda_contrato == "GS" & inmo$venta_alquiler == "Venta", " millones", ""), "</span></p>"))
+                                  )
+                                }else{
+                                  div(style = "position: absolute; margin-left: 0px; margin-top: 30px",
+                                      HTML(paste0("<p><span style='font-size: 190%; font-weight: lighter; color: ", main_color, "'>", 
+                                                  inmo$moneda_contrato, " ", precio_min, " - ", precio_max, 
+                                                  ifelse(inmo$moneda_contrato == "GS" & inmo$venta_alquiler == "Venta", " millones", ""), "</span></p>"))
+                                  )
+                                }
+                              }else{
+                                div(style = "position: absolute; margin-left: 0px; margin-top: 30px",
+                                    HTML(paste0("<p><span style='font-size: 190%; font-weight: lighter; color: ", main_color, "'>", 
+                                                inmo$moneda_contrato, " ", format(inmo$precio, big.mark = ".", decimal.mark = ",", scientific = FALSE), 
+                                                ifelse(inmo$moneda_contrato == "GS" & inmo$venta_alquiler == "Venta", " millones", ""), "</span></p>"))
+                                )
+                              },
+                              div(style = "position: absolute; margin-left: 0px; margin-top: 75px",
+                                  if(inmo$m2 != 0)
+                                    if(inmo$tipoPropiedad != "Propiedad rural"){
+                                                                          div(class = "btn-group",
+                                        HTML(paste0("<p><span style='padding-right: 7px; font-size: 90%; font-weight: normal; color: black'><i class='fa fa-ruler-combined'></i> ", 
+                                                    format(inmo$m2, big.mark = ".", decimal.mark = ",", scientific = FALSE), "m2 Terreno", "</span></p>")))
+                                    }else{
+                                                                          div(class = "btn-group",
+                                        HTML(paste0("<p><span style='padding-right: 7px; font-size: 90%; font-weight: normal; color: black'><i class='fa fa-ruler-combined'></i> ", 
+                                                    format(inmo$m2/10000, big.mark = ".", decimal.mark = ",", scientific = FALSE), " hectareas", "</span></p>")))
+                                    },
+
+                                  if(inmo$m2_cons != 0){
+                                    div(class = "btn-group",
+                                        HTML(paste0("<p><span style='padding-right: 7px; font-size: 90%; font-weight: normal; color: black'><i class='fa fa-home'></i> ", 
+                                                    inmo$m2_cons, "m2 Edificados", "</span></p>")))
+                                  }else{
+                                    if(inmo$tipoPropiedad == "Proyecto"){
+                                      div(class = "btn-group",
+                                          HTML(paste0("<p><span style='padding-right: 7px; font-size: 90%; font-weight: normal; color: black'><i class='fa fa-home'></i> ", 
+                                                      ifelse(m2_cons_min == m2_cons_max, m2_cons_min, paste0(m2_cons_min, "-", m2_cons_max)),
+                                                      "m2 Edif.", "</span></p>")))
+                                    }
+                                  },
+                                  if(inmo$frente != 0)
+                                    div(class = "btn-group",
+                                        HTML(paste0("<p><span style='padding-right: 7px; font-size: 90%; font-weight: normal; color: black'><i class='fa fa-ruler-horizontal'></i> ", 
+                                                    inmo$frente, "m Frente", "</span></p>"))),
+                                  if(inmo$fondo != 0)
+                                    div(class = "btn-group",
+                                        HTML(paste0("<p><span style='padding-right: 7px; font-size: 90%; font-weight: normal; color: black'><i class='fa fa-ruler-vertical'></i> ", 
+                                                    inmo$fondo, "m Fondo", "</span></p>"))),
+                                  if(!is.na(inmo$dormitorios)){
+                                    div(class = "btn-group",
+                                        HTML(paste0("<p><span style='padding-right: 7px; font-size: 90%; font-weight: normal; color: black'><i class='fa fa-bed'></i> ", 
+                                                    inmo$dormitorios, " Dormitorios", "</span></p>")))
+                                  }else{
+                                    if(inmo$tipoPropiedad == "Proyecto"){
+                                      div(class = "btn-group",
+                                          HTML(paste0("<p><span style='padding-right: 7px; font-size: 90%; font-weight: normal; color: black'><i class='fa fa-bed'></i> ", 
+                                                      ifelse(dormitorios_min == dormitorios_max, dormitorios_min, paste0(dormitorios_min, "-", dormitorios_max)), 
+                                                      " Dormitorios", "</span></p>")))
+                                    }
+                                  },
+                                  if(!is.na(inmo$banios)){
+                                    div(class = "btn-group",
+                                        HTML(paste0("<p><span style='padding-right: 7px; font-size: 90%; font-weight: normal; color: black'><i class='fa fa-bath'></i> ", 
+                                                    inmo$banios, " Baños", "</span></p>")))
+                                  }else{
+                                    if(inmo$tipoPropiedad == "Proyecto"){
+                                      div(class = "btn-group",
+                                          HTML(paste0("<p><span style='padding-right: 7px; font-size: 90%; font-weight: normal; color: black'><i class='fa fa-bath'></i> ", 
+                                                      ifelse(banios_min == banios_max, banios_min, paste0(banios_min, "-", banios_max)), 
+                                                      " Baños", "</span></p>")))
+                                    }
+                                  },
+                                  if(!is.na(inmo$garajes)){
+                                    div(class = "btn-group",
+                                        HTML(paste0("<p><span style='padding-right: 7px; font-size: 90%; font-weight: normal; color: black'><i class='fa fa-car-side'></i> ", 
+                                                    inmo$garajes, " Cocheras", "</span></p>")))
+                                  }else{
+                                    if(inmo$tipoPropiedad == "Proyecto"){
+                                      div(class = "btn-group",
+                                          HTML(paste0("<p><span style='padding-right: 7px; font-size: 90%; font-weight: normal; color: black'><i class='fa fa-car-side'></i> ", 
+                                                      ifelse(garajes_min == garajes_max, garajes_min, paste0(garajes_min, "-", garajes_max)), 
+                                                      " Cocheras", "</span></p>")))
+                                    }
+                                  },
+                                  if(!is.na(inmo$bauleras)){
+                                    div(class = "btn-group",
+                                        HTML(paste0("<p><span style='padding-right: 7px; font-size: 90%; font-weight: normal; color: black'><i class='fa fa-suitcase'></i> ", 
+                                                    inmo$bauleras, " Bauleras", "</span></p>")))
+                                  }else{
+                                    if(inmo$tipoPropiedad == "Proyecto"){
+                                      div(class = "btn-group",
+                                          HTML(paste0("<p><span style='padding-right: 7px; font-size: 90%; font-weight: normal; color: black'><i class='fa fa-suitcase'></i> ", 
+                                                      ifelse(bauleras_min == bauleras_max, bauleras_min, paste0(bauleras_min, "-", bauleras_max)), 
+                                                      " Bauleras", "</span></p>")))
+                                    }
+                                  },
+                                  if(!is.na(inmo$banios_compartidos)){
+                                    div(class = "btn-group",
+                                        HTML(paste0("<p><span style='padding-right: 7px; font-size: 90%; font-weight: normal; color: black'><i class='fa fa-toilet'></i> ", 
+                                                    inmo$banios_compartidos, " Baños compartidos", "</span></p>")))
+                                  },
+                                  if(!is.na(inmo$oficinas)){
+                                    div(class = "btn-group",
+                                        HTML(paste0("<p><span style='padding-right: 7px; font-size: 90%; font-weight: normal; color: black'><i class='fa fa-laptop-house'></i> ", 
+                                                    inmo$oficinas, " Oficinas", "</span></p>")))
+                                  },
+                                  if(!is.na(inmo$area_servicio)){
+                                    if(inmo$area_servicio == "si")
+                                      div(class = "btn-group",
+                                          HTML(paste0("<p><span style='padding-right: 7px; font-size: 90%; font-weight: normal; color: black'><i class='fa fa-broom'></i> ", 
+                                                      " Area de servicio", "</span></p>")))
+                                  },
+                                  if(!is.na(inmo$cocina_equipada)){
+                                    if(inmo$cocina_equipada == "si")
+                                      div(class = "btn-group",
+                                          HTML(paste0("<p><span style='padding-right: 7px; font-size: 90%; font-weight: normal; color: black'><i class='fa fa-utensils'></i> ", 
+                                                      " Cocina equipada", "</span></p>")))
+                                  },
+                                  if(!is.na(inmo$cocina_propia)){
+                                    if(inmo$cocina_propia == "si")
+                                      div(class = "btn-group",
+                                          HTML(paste0("<p><span style='padding-right: 7px; font-size: 90%; font-weight: normal; color: black'><i class='fa fa-utensils'></i> ", 
+                                                      " Kitchenette", "</span></p>")))
+                                  },
+                                  if(!is.na(inmo$quincho)){
+                                    if(inmo$quincho == "si")
+                                      div(class = "btn-group",
+                                          HTML(paste0("<p><span style='padding-right: 7px; font-size: 90%; font-weight: normal; color: black'><i class='fa fa-drumstick-bite'></i> ", 
+                                                      " Quincho", "</span></p>")))
+                                  },
+                                  if(!is.na(inmo$deposito)){
+                                    if(inmo$deposito == "si")
+                                      div(class = "btn-group",
+                                          HTML(paste0("<p><span style='padding-right: 7px; font-size: 90%; font-weight: normal; color: black'><i class='fa fa-warehouse'></i> ", 
+                                                      " Depósito", "</span></p>")))
+                                  },
+                                  if(!is.na(inmo$piscina)){
+                                    if(inmo$piscina == "si")
+                                      div(class = "btn-group",
+                                          HTML(paste0("<p><span style='padding-right: 7px; font-size: 90%; font-weight: normal; color: black'><i class='fa fa-swimming-pool'></i> ", 
+                                                      " Piscina", "</span></p>")))
+                                  },
+                                  if(!is.na(inmo$gimnasio)){
+                                    if(inmo$gimnasio == "si")
+                                      div(class = "btn-group",
+                                          HTML(paste0("<p><span style='padding-right: 7px; font-size: 90%; font-weight: normal; color: black'><i class='fa fa-dumbbell'></i> ", 
+                                                      " Gimnasio", "</span></p>")))
+                                  },
+                                  if(!is.na(inmo$generador)){
+                                    if(inmo$generador == "si")
+                                      div(class = "btn-group",
+                                          HTML(paste0("<p><span style='padding-right: 7px; font-size: 90%; font-weight: normal; color: black'><i class='fa fa-bolt'></i> ", 
+                                                      " Generador", "</span></p>")))
+                                  },
+                                  if(!is.na(inmo$trifacico)){
+                                    if(inmo$trifacico == "si")
+                                      div(class = "btn-group",
+                                          HTML(paste0("<p><span style='padding-right: 7px; font-size: 90%; font-weight: normal; color: black'><i class='fa fa-plug'></i> ", 
+                                                      " Trifacico", "</span></p>")))
+                                  },
+                                  if(!is.na(inmo$pet_friendly)){
+                                    if(inmo$pet_friendly == "si")
+                                      div(class = "btn-group",
+                                          HTML(paste0("<p><span style='padding-right: 7px; font-size: 90%; font-weight: normal; color: black'><i class='fa fa-dog'></i> ", 
+                                                      " Pet friendly", "</span></p>")))
+                                  },
+                                    if(!is.na(inmo$ascensor)){
+                                      ascensor <- str_extract_all(inmo$ascensor, "\\d+")[[1]] %>% as.integer()
+                                      if(ascensor > 0)
+                                        div(class = "btn-group",
+                                            HTML(paste0("<p><span style='padding-right: 7px; font-size: 90%; font-weight: normal; color: black'><i class='fa fa-dashboard'></i> ", 
+                                                        " Ascensor", "</span></p>")))
+                                    }
+                              )
+                          )
+                )
+         ),
+                  column(6, style = "width: 325px; padding: 0px; margin: 5px;",
+                      
+                                      fluidPage(style = "border-style: solid; border-width: 1px; border-color: #aaaaaa; 
+                       border-radius: 10px; background-color: white; padding: 5px; min-height: 230px;
+                                       margin: 0px; padding-left: 10px",
+                          div(align = "left",
+                              div(class = "btn-group", style = "width: 170px",
+                                  HTML(paste0("<p><span style='font-size: 100%; font-weight: normal; color: #888888'>Asesor inmobiliario</span></p>")),
+                                  br(),
+                                  HTML(paste0("<p><span style='font-size: 120%; font-weight: bold; color: #888888'>", agente$name, "</span></p>")),
+                                  HTML(paste0("<p><span style='font-size: 100%; font-weight: lighter; color: #666666'>", agencia_name, "</span></p>")),
+                                  div(
+                                  div(class = "btn-group",
+                                    HTML(paste0("<p><span style='font-size: 100%; font-weight: bold; color: #888888'>Contacta</span></p>")),
+                                  ),
+                                  if(!is.na(agente$phone)){
+                                    text_wp <- paste0("https://wa.me/", agente$phone, "?text=", "")
+                                    div(class = "btn-group",
+                                        a(href= text_wp, target="_blank", actionButton("nada", NULL , icon = icon("whatsapp"),
+                                                        style = "font-size: 250%; padding: 0px; padding-left: 20px; background-color: transparent; border-color: transparent"))
+                                    )
+                                  }
+                                  
+                                  ),
+                                  if(!is.na(agente$face)){
+                                    div(class = "btn-group",
+                                        a(href = agente$face, target="_blank", actionButton("nada", NULL , icon = icon("facebook"),
+                                                                                            style = "font-size: 150%; padding: 0px; padding-left: 0px; background-color: transparent; border-color: transparent"))
+                                    )
+                                  },
+                                  if(!is.na(agente$insta)){
+                                    div(class = "btn-group",
+                                        a(href = agente$insta, target="_blank", actionButton("nada", NULL , icon = icon("instagram"),
+                                                                                           style = "font-size: 150%; padding: 0px; padding-left: 25px; background-color: transparent; border-color: transparent"))
+                                    )
+                                  },
+                                  if(agente$user != ""){
+                                  div(class = "btn-group",
+                                      a(href= paste0("mailto:", agente$user), target="_blank", 
+                                        actionButton("nada", "" , icon = icon("envelope"),
+                                                     style = "font-size: 150%; padding: 0px; padding-left: 25px; background-color: transparent; border-color: transparent"))
+                                  )
+                                  },
+                              ),
+                              div(class = "btn-group", style = "position: absolute; margin-left: 10px; margin-top: 7px",
+                                  div(actionButton("nada", NULL, style = paste0('background-color: transparent;
+                                                             border: 0px; width: 120px; height: 120px; margin: 0px;
+                                                             background-image: url("', agente$img, '");
+                                                             background-size: cover, 120px 120px;
+                                                             border-radius: 8px 8px 8px 8px')),
+                                  )
+                              )
+                          )
+                )
+                      
+                  )
+         
+         
+)    
+    }else{
+                fluidPage(style = paste0("border-style: solid; border-width: 1px; border-color: #aaaaaa; 
+                       border-radius: 10px; background-color: white; padding: 10px; padding-top: 5px; margin: 0px;"),
+                          div(style = "padding: 0px", align = "left",
+                              div(HTML(paste0("<p><span style='font-size: 180%; font-weight: bold; color: #666666'>", 
+                                        inmo$titulo, "</span></p>")), align = "center"),
+                              fluidRow(
+                                column(6, 
+                                div(
+                                    HTML(paste0("<p><span style='font-size: 120%; font-weight: normal; color: #888888'>", 
+                                                inmo$tipoPropiedad, " en ", inmo$venta_alquiler, "</span></p>")),
+                                
+                              ),
+                              if(inmo$tipoPropiedad == "Proyecto"){
+                                if(precio_min == precio_max){
+                                  div(
+                                      HTML(paste0("<p><span style='font-size: 190%; font-weight: lighter; color: ", main_color, "'>", 
+                                                  inmo$moneda_contrato, " ", precio_min, 
+                                                  ifelse(inmo$moneda_contrato == "GS" & inmo$venta_alquiler == "Venta", " millones", ""), "</span></p>"))
+                                  )
+                                }else{
+                                  div(
+                                      HTML(paste0("<p><span style='font-size: 190%; font-weight: lighter; color: ", main_color, "'>", 
+                                                  inmo$moneda_contrato, " ", precio_min, " - ", precio_max, 
+                                                  ifelse(inmo$moneda_contrato == "GS" & inmo$venta_alquiler == "Venta", " millones", ""), "</span></p>"))
+                                  )
+                                }
+                              }else{
+                                div(
+                                    HTML(paste0("<p><span style='font-size: 190%; font-weight: lighter; color: ", main_color, "'>", 
+                                                inmo$moneda_contrato, " ", format(inmo$precio, big.mark = ".", decimal.mark = ",", scientific = FALSE), 
+                                                ifelse(inmo$moneda_contrato == "GS" & inmo$venta_alquiler == "Venta", " millones", ""), "</span></p>"))
+                                )
+                              },
+                                ),
+                              column(6,
+                              div(
+                                  if(inmo$m2 != 0)
+                                    div(class = "btn-group",
+                                        HTML(paste0("<p><span style='padding-right: 7px; font-size: 90%; font-weight: normal; color: black'><i class='fa fa-ruler-combined'></i> ", 
+                                                    inmo$m2, "m2 Terreno", "</span></p>"))),
+                                  if(inmo$m2_cons != 0){
+                                    div(class = "btn-group",
+                                        HTML(paste0("<p><span style='padding-right: 7px; font-size: 90%; font-weight: normal; color: black'><i class='fa fa-home'></i> ", 
+                                                    inmo$m2_cons, "m2 Edificados", "</span></p>")))
+                                  }else{
+                                    if(inmo$tipoPropiedad == "Proyecto"){
+                                      div(class = "btn-group",
+                                          HTML(paste0("<p><span style='padding-right: 7px; font-size: 90%; font-weight: normal; color: black'><i class='fa fa-home'></i> ", 
+                                                      ifelse(m2_cons_min == m2_cons_max, m2_cons_min, paste0(m2_cons_min, "-", m2_cons_max)),
+                                                      "m2 Edif.", "</span></p>")))
+                                    }
+                                  },
+                                  if(inmo$frente != 0)
+                                    div(class = "btn-group",
+                                        HTML(paste0("<p><span style='padding-right: 7px; font-size: 90%; font-weight: normal; color: black'><i class='fa fa-ruler-horizontal'></i> ", 
+                                                    inmo$frente, "m Frente", "</span></p>"))),
+                                  if(inmo$fondo != 0)
+                                    div(class = "btn-group",
+                                        HTML(paste0("<p><span style='padding-right: 7px; font-size: 90%; font-weight: normal; color: black'><i class='fa fa-ruler-vertical'></i> ", 
+                                                    inmo$fondo, "m Fondo", "</span></p>"))),
+                                  if(!is.na(inmo$dormitorios)){
+                                    div(class = "btn-group",
+                                        HTML(paste0("<p><span style='padding-right: 7px; font-size: 90%; font-weight: normal; color: black'><i class='fa fa-bed'></i> ", 
+                                                    inmo$dormitorios, " Dormitorios", "</span></p>")))
+                                  }else{
+                                    if(inmo$tipoPropiedad == "Proyecto"){
+                                      div(class = "btn-group",
+                                          HTML(paste0("<p><span style='padding-right: 7px; font-size: 90%; font-weight: normal; color: black'><i class='fa fa-bed'></i> ", 
+                                                      ifelse(dormitorios_min == dormitorios_max, dormitorios_min, paste0(dormitorios_min, "-", dormitorios_max)), 
+                                                      " Dormitorios", "</span></p>")))
+                                    }
+                                  },
+                                  if(!is.na(inmo$banios)){
+                                    div(class = "btn-group",
+                                        HTML(paste0("<p><span style='padding-right: 7px; font-size: 90%; font-weight: normal; color: black'><i class='fa fa-bath'></i> ", 
+                                                    inmo$banios, " Baños", "</span></p>")))
+                                  }else{
+                                    if(inmo$tipoPropiedad == "Proyecto"){
+                                      div(class = "btn-group",
+                                          HTML(paste0("<p><span style='padding-right: 7px; font-size: 90%; font-weight: normal; color: black'><i class='fa fa-bath'></i> ", 
+                                                      ifelse(banios_min == banios_max, banios_min, paste0(banios_min, "-", banios_max)), 
+                                                      " Baños", "</span></p>")))
+                                    }
+                                  },
+                                  if(!is.na(inmo$garajes)){
+                                    div(class = "btn-group",
+                                        HTML(paste0("<p><span style='padding-right: 7px; font-size: 90%; font-weight: normal; color: black'><i class='fa fa-car-side'></i> ", 
+                                                    inmo$garajes, " Cocheras", "</span></p>")))
+                                  }else{
+                                    if(inmo$tipoPropiedad == "Proyecto"){
+                                      div(class = "btn-group",
+                                          HTML(paste0("<p><span style='padding-right: 7px; font-size: 90%; font-weight: normal; color: black'><i class='fa fa-car-side'></i> ", 
+                                                      ifelse(garajes_min == garajes_max, garajes_min, paste0(garajes_min, "-", garajes_max)), 
+                                                      " Cocheras", "</span></p>")))
+                                    }
+                                  },
+                                  if(!is.na(inmo$bauleras)){
+                                    div(class = "btn-group",
+                                        HTML(paste0("<p><span style='padding-right: 7px; font-size: 90%; font-weight: normal; color: black'><i class='fa fa-suitcase'></i> ", 
+                                                    inmo$bauleras, " Bauleras", "</span></p>")))
+                                  }else{
+                                    if(inmo$tipoPropiedad == "Proyecto"){
+                                      div(class = "btn-group",
+                                          HTML(paste0("<p><span style='padding-right: 7px; font-size: 90%; font-weight: normal; color: black'><i class='fa fa-suitcase'></i> ", 
+                                                      ifelse(bauleras_min == bauleras_max, bauleras_min, paste0(bauleras_min, "-", bauleras_max)), 
+                                                      " Bauleras", "</span></p>")))
+                                    }
+                                  },
+                                  if(!is.na(inmo$banios_compartidos)){
+                                    div(class = "btn-group",
+                                        HTML(paste0("<p><span style='padding-right: 7px; font-size: 90%; font-weight: normal; color: black'><i class='fa fa-toilet'></i> ", 
+                                                    inmo$banios_compartidos, " Baños compartidos", "</span></p>")))
+                                  },
+                                  if(!is.na(inmo$oficinas)){
+                                    div(class = "btn-group",
+                                        HTML(paste0("<p><span style='padding-right: 7px; font-size: 90%; font-weight: normal; color: black'><i class='fa fa-laptop-house'></i> ", 
+                                                    inmo$oficinas, " Oficinas", "</span></p>")))
+                                  },
+                                  if(!is.na(inmo$area_servicio)){
+                                    if(inmo$area_servicio == "si")
+                                      div(class = "btn-group",
+                                          HTML(paste0("<p><span style='padding-right: 7px; font-size: 90%; font-weight: normal; color: black'><i class='fa fa-broom'></i> ", 
+                                                      " Area de servicio", "</span></p>")))
+                                  },
+                                  if(!is.na(inmo$cocina_equipada)){
+                                    if(inmo$cocina_equipada == "si")
+                                      div(class = "btn-group",
+                                          HTML(paste0("<p><span style='padding-right: 7px; font-size: 90%; font-weight: normal; color: black'><i class='fa fa-utensils'></i> ", 
+                                                      " Cocina equipada", "</span></p>")))
+                                  },
+                                  if(!is.na(inmo$cocina_propia)){
+                                    if(inmo$cocina_propia == "si")
+                                      div(class = "btn-group",
+                                          HTML(paste0("<p><span style='padding-right: 7px; font-size: 90%; font-weight: normal; color: black'><i class='fa fa-utensils'></i> ", 
+                                                      " Kitchenette", "</span></p>")))
+                                  },
+                                  if(!is.na(inmo$quincho)){
+                                    if(inmo$quincho == "si")
+                                      div(class = "btn-group",
+                                          HTML(paste0("<p><span style='padding-right: 7px; font-size: 90%; font-weight: normal; color: black'><i class='fa fa-drumstick-bite'></i> ", 
+                                                      " Quincho", "</span></p>")))
+                                  },
+                                  if(!is.na(inmo$deposito)){
+                                    if(inmo$deposito == "si")
+                                      div(class = "btn-group",
+                                          HTML(paste0("<p><span style='padding-right: 7px; font-size: 90%; font-weight: normal; color: black'><i class='fa fa-warehouse'></i> ", 
+                                                      " Depósito", "</span></p>")))
+                                  },
+                                  if(!is.na(inmo$piscina)){
+                                    if(inmo$piscina == "si")
+                                      div(class = "btn-group",
+                                          HTML(paste0("<p><span style='padding-right: 7px; font-size: 90%; font-weight: normal; color: black'><i class='fa fa-swimming-pool'></i> ", 
+                                                      " Piscina", "</span></p>")))
+                                  },
+                                  if(!is.na(inmo$gimnasio)){
+                                    if(inmo$gimnasio == "si")
+                                      div(class = "btn-group",
+                                          HTML(paste0("<p><span style='padding-right: 7px; font-size: 90%; font-weight: normal; color: black'><i class='fa fa-dumbbell'></i> ", 
+                                                      " Gimnasio", "</span></p>")))
+                                  },
+                                  if(!is.na(inmo$generador)){
+                                    if(inmo$generador == "si")
+                                      div(class = "btn-group",
+                                          HTML(paste0("<p><span style='padding-right: 7px; font-size: 90%; font-weight: normal; color: black'><i class='fa fa-bolt'></i> ", 
+                                                      " Generador", "</span></p>")))
+                                  },
+                                  if(!is.na(inmo$trifacico)){
+                                    if(inmo$trifacico == "si")
+                                      div(class = "btn-group",
+                                          HTML(paste0("<p><span style='padding-right: 7px; font-size: 90%; font-weight: normal; color: black'><i class='fa fa-plug'></i> ", 
+                                                      " Trifacico", "</span></p>")))
+                                  },
+                                  if(!is.na(inmo$pet_friendly)){
+                                    if(inmo$pet_friendly == "si")
+                                      div(class = "btn-group",
+                                          HTML(paste0("<p><span style='padding-right: 7px; font-size: 90%; font-weight: normal; color: black'><i class='fa fa-dog'></i> ", 
+                                                      " Pet friendly", "</span></p>")))
+                                  }
+                              )
+                          )
+                )
+                          )
+                )
+    }
+)
+```
+
+```{r galeria, echo = FALSE, warning=FALSE}
+
+    tags$style(HTML("
+    .slick-slide img {
+    width: 100% !important;
+    }
+    "))
+
+  serie <- str_extract(inmo$img, "_[0-9][0-9][0-9]-small") %>% str_remove("_") %>% str_remove("-small")
+
+    list <- list_spaces_do(prefix = paste0("fotos-inmo/", inmo$id), delimiter = "small")
+  
+    list <- list[str_detect(list$Key, paste0(serie, ".jpg")),]
+  
+    
+    imgs <- paste0("https://place-storage.nyc3.digitaloceanspaces.com/", list$Key)
+    cP2 <- JS(
+      "function(slick,index) {
+          return '<a><img src= ' + dotObj[index] + '  width=30px height=30px></a>';
+          }"
+    )
+    
+    opts_dot_logo <-
+      settings(
+        autoplay = TRUE,
+        autoplaySpeed = 2000,
+        dots = TRUE,
+        customPaging = cP2
+      )
+    
+    s2 <- htmltools::tags$script(sprintf("var dotObj = %s", jsonlite::toJSON(imgs)))
+    
+    slick_dots_logo <- slickR(obj = imgs, width = "95%", height = "100%") + settings(adaptiveHeight = TRUE) + opts_dot_logo
+    div(style = "min-width: 325px; max-width: 660px", 
+    fluidPage(style = paste0("border-style: solid; border-width: 1px; border-color: #aaaaaa;
+                       border-radius: 10px; background-color: white; padding: 10px; margin: 0px;"),
+    htmltools::tagList(s2, slick_dots_logo)
+    )
+    )
+```
+
+```{r tipologias, echo = FALSE, warning=FALSE}
+    if(inmo$tipoPropiedad == "Proyecto"){
+    div(style = "min-width: 325px; max-width: 660px",
+        fluidPage(style = "border-style: solid; border-width: 1px; border-color: #aaaaaa; 
+                       border-radius: 10px; background-color: white; padding: 10px; margin: 0px; margin-top: 10px",
+                  HTML(paste0("<p><span style='font-size: 120%; font-weight: normal; color: #888888'>Tipologías</span></p>")),
+
+        div(do.call(fluidRow, boxes), align = "center")
+        )
+          )
+    }
+```
+
+
+```{r descripcion_mapa, echo = FALSE, warning=FALSE}
+div(align = "center",
+fluidRow(style = "padding: 0px;",
+         column(6, style = "width: 325px; padding: 0px; margin: 5px;",
+                fluidPage(style = paste0("border-style: solid; border-width: 1px; border-color: #aaaaaa; 
+                       border-radius: 10px; background-color: white; padding: 10px; margin: 0px; height: 300px"), align = "left",
+                          HTML(paste0("<p><span style='font-size: 120%; font-weight: normal; color: #888888'>Descripción</span></p>")),
+                          div(style = "overflow-y: scroll; height: 250px",
+                            HTML(paste0("<p><span style='font-size: 100%; font-weight: normal; color: black; white-space: pre-wrap;'>", inmo$descripcion, "</span></p>"))
+                          )
+                )
+         ),
+                  column(6, style = "width: 325px; padding: 0px; margin: 5px;",
+                                      fluidPage(style = "border-style: solid; border-width: 1px; border-color: #aaaaaa; 
+                       border-radius: 10px; background-color: white; padding: 3px;
+                                       margin: 0px;",
+leaflet(height = 292) %>%
+        setView(inmo$lon, inmo$lat, zoom = 13) %>%
+        addPulseMarkers(lng = inmo$lon, lat = inmo$lat, icon = makePulseIcon(heartbeat = 0.7, color = "blue")) %>%
+        addTiles("https://mt1.google.com/vt/lyrs=r&x={x}&y={y}&z={z}", group = "mapa") %>%
+        addTiles("https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}", group = "satélite") %>%
+        addLayersControl(baseGroups = c("mapa", "satélite"),
+                         options = layersControlOptions(collapsed=FALSE), position = "bottomleft")
+                )
+                  )
+         
+         
+)    
+)
+
+```
+

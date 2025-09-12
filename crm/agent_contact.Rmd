@@ -1,0 +1,180 @@
+---
+title: ""
+description: Enhance communication with interactive visualizations 
+base_url: https://placeanalyzer.com.py
+preview: https://place-storage.nyc3.digitaloceanspaces.com/skyone/fotos-inmo/skyone_inmueble_0000000006-01-small.jpg
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Vignette Title}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+params: 
+  agente: NA
+  agencia_name: NA
+---
+
+
+```{r ini, include = FALSE, echo = FALSE, warning=FALSE}
+
+company <- "SkyOne"
+co <- "skyone"
+main_color <- "#0f2b68"
+
+```
+
+```{r style, echo = FALSE, warning=FALSE}
+
+                      tags$style(type = "text/css", paste0("
+                                  .btn-group:after {display: table;}
+
+
+                                  body {background:
+  linear-gradient(to bottom, #254277, 70%, #c8cdd8);
+  background-repeat: no-repeat, no-repeat;
+  background-size: cover;
+  height: 100%;
+  width: 100vw;}
+  
+
+                                  "))
+
+```
+
+
+```{r setup, include = FALSE, echo = FALSE, warning=FALSE}
+
+agente <- params$agente
+agencia_name <- params$agencia_name    
+
+    
+    meta() %>%
+      meta_social(
+        title = agente$name,
+        description = HTML(paste0(agente$cargo, " - ", agencia_name)),
+        url = "https://www.skyone.com.py",
+        image = agente$img
+      ) %>% include_meta()
+    
+    
+      skyone_marker <- makeIcon(
+    iconUrl = "www/skyone_marker.png",
+    iconWidth = 60, iconHeight = 60,
+    iconAnchorX = 30, iconAnchorY = 60
+  )
+
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+
+```
+
+```{r titulo, echo = FALSE, warning=FALSE}
+div(
+  br(),
+                                a(href = "https://skyone.group", target="_blank", 
+                                actionButton("inmo_show", NULL, style = "background-color: transparent;
+                                                             border: 0px; width:160px; height: 45px; margin: 0px;
+                                                             background-image: url('https://place-storage.nyc3.digitaloceanspaces.com/skyone/skyone_logo_blanco.png');
+                                                             background-size: 160px;
+                                             background-repeat: no-repeat, no-repeat;")),
+  br(),
+  br(),
+  align = "center"
+  )
+```
+
+```{r caracteristicas_agente, echo = FALSE, warning=FALSE}
+                                      fluidPage(style = "border-style: solid; border-width: 1px; border-color: #aaaaaa; 
+                       border-radius: 15px; background-color: white; padding: 10px;
+                                       margin: 0px;",
+                          fluidRow(
+                              column(5, align = "center",
+                                  div(actionButton("nada", NULL, style = paste0('background-color: transparent;
+                                                             border: 0px; width: 250px; height: 250px; margin: 0px;
+                                                             background-image: url("', agente$img, '");
+                                                             background-size: cover, 250px 250px;
+                                                             border-radius: 10px')),
+                                  )
+                              ),
+                                                            column(7,
+                                  div(HTML(paste0("<p><span style='font-size: 130%; font-weight: normal; color: #888888'>Estado: ", 
+                                              ifelse(agente$active == 1, "Activo", "Inactivo"), "</span></p>")), align = "center"),
+                                  br(),
+                                  div(HTML(paste0("<p><span style='font-size: 160%; font-weight: bold; color: #3e567f'>", agente$name, "</span></p>")), align = "center"),                                       div(HTML(paste0("<p><span style='font-size: 140%; font-weight: normal; color: #666666'>", agente$cargo, "</span></p>")), align = "center"),
+                                  if(agente$cargo != "Global Master Office"){ 
+                                  div(HTML(paste0("<p><span style='font-size: 140%; font-weight: normal; color: #666666'>", agencia_name, "</span></p>")), align = "center")
+                                  },
+                                  br(),
+                                  div(align = "center",
+                           if(!is.na(agente$phone)){
+                             div(class = "btn-group",
+                                  HTML(paste0("<p><span style='font-size: 120%; font-weight: bold; padding: 0px; color: #000000'>", agente$phone, "</span></p>"))
+                             )
+                           },
+                                  if(!is.na(agente$phone)){
+                                    text_wp <- paste0("https://wa.me/", agente$phone, "?text=", "")
+                                    div(class = "btn-group",
+                                        a(href= text_wp, target="_blank", actionButton("nada", NULL , icon = icon("whatsapp"),
+                                                        style = "font-size: 180%; padding: 0px;  padding-left: 5px; background-color: transparent; border-color: transparent"))
+                                    )
+                                  },
+                                  if(!is.na(agente$face)){
+                                    div(class = "btn-group",
+                                        a(href = agente$face, target="_blank", actionButton("nada", NULL , icon = icon("facebook"),
+                                                                                            style = "font-size: 180%; padding: 0px; padding-left: 15px; background-color: transparent; border-color: transparent"))
+                                    )
+                                  },
+                                  if(!is.na(agente$insta)){
+                                    div(class = "btn-group",
+                                        a(href = agente$insta, target="_blank", actionButton("nada", NULL , icon = icon("instagram"),
+                                                                                           style = "font-size: 180%; padding: 0px; padding-left: 15px; background-color: transparent; border-color: transparent"))
+                                    )
+                                  },
+                                  if(agente$user != ""){
+                                  div(class = "btn-group",
+                                      a(href= paste0("mailto:", agente$user), target="_blank", 
+                                        actionButton("nada", "" , icon = icon("envelope"),
+                                                     style = "font-size: 180%; padding: 0px; padding-left: 15px; background-color: transparent; border-color: transparent"))
+                                  )
+                                  }
+                                  )
+                              )
+                          )
+                )
+```
+
+```{r gen_qr, include = FALSE, echo = FALSE, warning=FALSE}
+
+vcard <- paste0("BEGIN:VCARD\n
+VERSION:3.0\n
+N:;", agente$name, "\n
+FN:", agente$name, "\n
+ORG:SkyOne Real Estate Latam\n
+TITLE:", agente$cargo, "\n
+ADR:;;;;;;\n
+TEL;WORK;VOICE:", agente$phone, "\n
+TEL;CELL:Mobile\n
+TEL;FAX:\n
+EMAIL;WORK;INTERNET:", agente$user, "\n
+URL:https://skyone.group\n
+END:VCARD")
+
+tempQR <- file.path(tempdir(), "qr_vcard.png")
+tempSVG <- file.path(tempdir(), "qr_vcard.svg")
+png(tempQR)
+qrv <- qr_code(vcard)
+plot(qrv)
+dev.off()
+qr <- dataURI(file = tempQR)
+
+```
+
+```{r qshow_r, echo = FALSE, warning=FALSE}
+div(align = "center",
+    br(),
+    tags$img(src= qr, width = "300px"),
+    h4("Escanea el código para guardar el contacto"),
+
+)
+```
