@@ -53,7 +53,7 @@ library(tinytex)
 #install_tinytex()
 library(glue)
 
-update.packages(ask = FALSE)
+#update.packages(ask = FALSE)
 library(sortable) #arrastrar para ordenar
 
 library(slickR) #carousel de fotos
