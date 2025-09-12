@@ -56,7 +56,7 @@ library(glue)
 #update.packages(ask = FALSE)
 library(sortable) #arrastrar para ordenar
 
-library(slickR) #carousel de fotos
+#library(slickR) #carousel de fotos
 
 library(metathis) #metadatos para el reporte html
 
