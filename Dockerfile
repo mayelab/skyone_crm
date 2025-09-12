@@ -23,8 +23,9 @@ RUN apt-get update && apt-get install -y \
 # basic shiny functionality
 RUN R -e "install.packages(c('shiny', 'rmarkdown', 'xfun', 'remotes'), repos='https://cloud.r-project.org/')"
 
-# install dependencies of the euler app  
-RUN R -e "remotes::install_github('johndharrison/slickR')"
+# install dependencies of the app  
+RUN R -e "library(remotes)"
+RUN R -e "remotes::install_github('yonicd/slickR', force = TRUE, upgrade = 'never')"
 RUN R -e "install.packages(c('shinydashboard', 'tidyverse', 'readr', 'rvest', 'leaflet', 'stringr', 'DT', 'data.table', 'leaflet.extras', 'sp', 'sf', 'editData', 'shinyalert', 'shinyWidgets', 'hereR', 'shinybusy', 'RMySQL', 'lwgeom', 'DBI', 'shinyjs', 'digest', 'lubridate', 'stringi', 'blastula', 'tcltk', 'httr', 'jsonlite', 'rlist', 'vembedr', 'rgeos', 'aws.s3', 'base64enc', 'magick', 'colorspace', 'callr', 'fontawesome', 'toastui', 'tinytex', 'glue', 'sortable', 'metathis', 'qrcode', 'rclipboard', 'zip', 'htmltools', 'textutils'), repos='https://cloud.r-project.org/')"
 
 # copy the app to the image
