@@ -53,7 +53,7 @@ library(tinytex)
 #install_tinytex()
 library(glue)
 library(sortable) #arrastrar para ordenar
-
+install.packages("sortable")
 library(slickR) #carousel de fotos
 
 library(metathis) #metadatos para el reporte html
