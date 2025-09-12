@@ -52,7 +52,10 @@ library(toastui)
 library(tinytex)
 #install_tinytex()
 library(glue)
+
+install.packages("sortable")
 library(sortable) #arrastrar para ordenar
+
 install.packages("sortable")
 library(slickR) #carousel de fotos
 
