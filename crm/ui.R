@@ -1,44 +1,45 @@
-ui <- dashboardPage(skin = "blue",
-                    header = dashboardHeader(
-                      title = tags$a(href='https://skyone.group/portal',
-                                     tags$img(src = logo_header, width = 120)),
-                      tags$li(uiOutput("eventos_bttn_ui"), class= 'dropdown'),
-                      tags$li(uiOutput("alarmas_bttn_ui"), class= 'dropdown'), 
-                      tags$li(uiOutput("llamadas_bttn_ui"), class= 'dropdown'),
-                      tags$li(uiOutput("perfil_bttn_ui"), class= 'dropdown')
-                    ),
-                    
-                    sidebar = dashboardSidebar(width = 200,
-                                             div(
-                                               br(),
-                                               br(),
-                                               sidebarMenuOutput("menu_ui"),
-                                               br(),
-                                               br(),
-                                               br(),
-                                               br(),
-                                               br(),
-                                               br(),
-                                               br(),
-                                               br(),
-                                               textOutput("keepAlive")
-                                             )
-                    ),
-                    
-                    body = dashboardBody(shinyjs::useShinyjs(), 
-                                          
-                                          rclipboardSetup(),
-                                          
-                                          extendShinyjs(text = "shinyjs.resetCRM = function() {history.go(0)}", functions = "resetCRM"),
-                                          
-                                          tags$head(tags$link(rel = "icon", type = "image/png", sizes = "32x32", href = logo_browser)),
-                                          
-                                          tags$script(HTML('
+ui <- div(class="notranslate", 
+          dashboardPage(skin = "blue",
+                        header = dashboardHeader(
+                          title = tags$a(href='https://skyone.group/portal',
+                                         tags$img(src = logo_header, width = 120)),
+                          tags$li(uiOutput("eventos_bttn_ui"), class= 'dropdown'),
+                          tags$li(uiOutput("alarmas_bttn_ui"), class= 'dropdown'), 
+                          tags$li(uiOutput("llamadas_bttn_ui"), class= 'dropdown'),
+                          tags$li(uiOutput("perfil_bttn_ui"), class= 'dropdown')
+                        ),
+                        
+                        sidebar = dashboardSidebar(width = 200,
+                                                   div(
+                                                     br(),
+                                                     br(),
+                                                     sidebarMenuOutput("menu_ui"),
+                                                     br(),
+                                                     br(),
+                                                     br(),
+                                                     br(),
+                                                     br(),
+                                                     br(),
+                                                     br(),
+                                                     br(),
+                                                     textOutput("keepAlive")
+                                                   )
+                        ),
+                        
+                        body = dashboardBody(shinyjs::useShinyjs(), 
+                                             
+                                             rclipboardSetup(),
+                                             
+                                             extendShinyjs(text = "shinyjs.resetCRM = function() {history.go(0)}", functions = "resetCRM"),
+                                             
+                                             tags$head(tags$link(rel = "icon", type = "image/png", sizes = "32x32", href = logo_browser)),
+                                             
+                                             tags$script(HTML('
                                     <div id="fb-root"></div>
                                     <script async defer crossorigin="anonymous" src="https://connect.facebook.net/es_ES/sdk.js#xfbml=1&version=v13.0&appId=288335385666465&autoLogAppEvents=1" nonce="YuFugR4n"></script>
                       ')),
-                                          
-                                          tags$script(HTML(paste0('
+                                             
+                                             tags$script(HTML(paste0('
                       
                       $(document).ready(function() {document.title = "', browser_name, '";});
                       
@@ -125,8 +126,8 @@ ui <- dashboardPage(skin = "blue",
                       
                       
                       '))),
-                                          
-                                          tags$style(type = "text/css", paste0('
+                                             
+                                             tags$style(type = "text/css", paste0('
 
                                  #inline input{border-radius: 10px;}
                                  #inline .selectize-input{border-radius: 10px;}
@@ -321,48 +322,49 @@ ui <- dashboardPage(skin = "blue",
                                    #back_hover:hover a {background-color: ', lighten(main_color, 0.20), ';}     
                                                            
                       ')),
-                                          
-                                          setShadow(class = "box"),
-                                          setShadow(id = "ingresar"),
-                                          setShadow(id = "registro"),
-                                          setShadow(id = "login_user"),
-                                          setShadow(id = "login_pass"),
-                                          
-                                          add_busy_gif(src = "pin_rot_small.gif", position = "full-page", 
-                                                       overlay_color = "transparent", height = 60, width = 60),
-                                          fluidPage(width=12, 
-                                                    fluidRow(width = 1,
-                                                             uiOutput("logo_inmo_ui")    
-                                                    ),
-                                                    
-                                                    inputIp("ipid"),
-                                                    inputUserid("fingerprint"),
-                                                    
-                                                    useShinyalert(), 
-                                                    uiOutput("alarmas_ui"),
-                                                    uiOutput("task_ui"),
-                                                    uiOutput("box_eventos_ui"),
-                                                    uiOutput("home_ui"),
-                                                    uiOutput("office_agen_ui"),
-                                                    uiOutput("box_office_prop_ui"),
-                                                    uiOutput("box_office_cont_ui"),
-                                                    uiOutput("box_estado_ui"),
-                                                    uiOutput("box_office_trans_ui"),
-                                                    uiOutput("new_inmo_ui"),
-                                                    uiOutput("edit_inmo_ui"),
-                                                    uiOutput("new_busqueda_ui"),
-                                                    uiOutput("box_clien_ui"),
-                                                    uiOutput("box_busqueda_ui"),
-                                                    uiOutput("box_inmo_ui"),
-                                                    uiOutput("mi_nube_ui"),
-                                                    uiOutput("capacitacion_ui"),
-                                                    uiOutput("prop_todas_ui"),
-                                                    uiOutput("bus_todas_ui"),
-                                                    uiOutput("myplace_ui"),
-                                                    uiOutput("place_view_ui"),
-                                                    uiOutput("place_ui"),
-                                                    uiOutput("notificacion_generando_ui"),
-                                                    uiOutput("notificacion_saldo_ui")
-                                          )    
-                    )
+                                             
+                                             setShadow(class = "box"),
+                                             setShadow(id = "ingresar"),
+                                             setShadow(id = "registro"),
+                                             setShadow(id = "login_user"),
+                                             setShadow(id = "login_pass"),
+                                             
+                                             add_busy_gif(src = "pin_rot_small.gif", position = "full-page", 
+                                                          overlay_color = "transparent", height = 60, width = 60),
+                                             fluidPage(width=12, 
+                                                       fluidRow(width = 1,
+                                                                uiOutput("logo_inmo_ui")    
+                                                       ),
+                                                       
+                                                       inputIp("ipid"),
+                                                       inputUserid("fingerprint"),
+                                                       
+                                                       useShinyalert(), 
+                                                       uiOutput("alarmas_ui"),
+                                                       uiOutput("task_ui"),
+                                                       uiOutput("box_eventos_ui"),
+                                                       uiOutput("home_ui"),
+                                                       uiOutput("office_agen_ui"),
+                                                       uiOutput("box_office_prop_ui"),
+                                                       uiOutput("box_office_cont_ui"),
+                                                       uiOutput("box_estado_ui"),
+                                                       uiOutput("box_office_trans_ui"),
+                                                       uiOutput("new_inmo_ui"),
+                                                       uiOutput("edit_inmo_ui"),
+                                                       uiOutput("new_busqueda_ui"),
+                                                       uiOutput("box_clien_ui"),
+                                                       uiOutput("box_busqueda_ui"),
+                                                       uiOutput("box_inmo_ui"),
+                                                       uiOutput("mi_nube_ui"),
+                                                       uiOutput("capacitacion_ui"),
+                                                       uiOutput("prop_todas_ui"),
+                                                       uiOutput("bus_todas_ui"),
+                                                       uiOutput("myplace_ui"),
+                                                       uiOutput("place_view_ui"),
+                                                       uiOutput("place_ui"),
+                                                       uiOutput("notificacion_generando_ui"),
+                                                       uiOutput("notificacion_saldo_ui")
+                                             )    
+                        )
+          )
 )  
