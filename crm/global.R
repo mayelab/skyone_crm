@@ -53,10 +53,12 @@ library(tinytex)
 #install_tinytex()
 library(glue)
 
+
+install.packages("xfun")
 install.packages("sortable")
+update.packages(ask = FALSE)
 library(sortable) #arrastrar para ordenar
 
-install.packages("sortable")
 library(slickR) #carousel de fotos
 
 library(metathis) #metadatos para el reporte html
