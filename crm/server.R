@@ -4161,7 +4161,6 @@ server <- function(input, output, session){
         put_object_do(paste0("/", file_name), tempHTML)
         agen$link <- paste0("https://place-storage.nyc3.digitaloceanspaces.com/", file_name)
         
-        dev.off()
         tempQR <- file.path(dir, paste0(session$token, "qrplot.png"))
         png(tempQR)
         qrv <- qr_code(agen$link)
