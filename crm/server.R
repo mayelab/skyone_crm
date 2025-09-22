@@ -11062,7 +11062,6 @@ server <- function(input, output, session){
     }
     
     error <- tryCatch({
-      dev.off()
       tempQR <- file.path(dir, paste0(session$token, "qrplot.png"))
       png(tempQR)
       qrv <- qr_code(file)
