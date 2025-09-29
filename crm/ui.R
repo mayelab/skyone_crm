@@ -1,6 +1,6 @@
 ui <- dashboardPage(skin = "blue",
                     header = dashboardHeader(
-                      title = tags$a(href='https://skyone.group/portal',
+                      title = tags$a(href='https://skyone.group/app_direct/portal',
                                      tags$img(src = logo_header, width = 120)),
                       tags$li(uiOutput("eventos_bttn_ui"), class= 'dropdown'),
                       tags$li(uiOutput("alarmas_bttn_ui"), class= 'dropdown'), 
