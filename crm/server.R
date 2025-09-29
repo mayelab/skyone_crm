@@ -75,10 +75,10 @@ server <- function(input, output, session){
     print(vars$area_busqueda)
   })
   
-  output$keepAlive <- renderText({
-    req(input$count)
-    paste("  Online ", input$count, ifelse(input$count == 1, " minuto", " minutos"))
-  })  
+#  output$keepAlive <- renderText({
+#    req(input$count)
+#    paste("  Online ", input$count, ifelse(input$count == 1, " minuto", " minutos"))
+#  })  
   
   skyone_marker <- makeIcon(
     iconUrl = "skyone_marker.png",

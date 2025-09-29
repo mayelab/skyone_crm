@@ -20,8 +20,8 @@ ui <- dashboardPage(skin = "blue",
                                                br(),
                                                br(),
                                                br(),
-                                               br(),
-                                               textOutput("keepAlive")
+                                               br()#,
+                                               #textOutput("keepAlive")
                                              )
                     ),
                     
