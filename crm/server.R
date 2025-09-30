@@ -1873,7 +1873,7 @@ server <- function(input, output, session){
     
     transa <- query_mysql(paste0("SELECT tipo FROM skyone_transacciones WHERE 
                                  user IN ", paste("(", paste(paste0("'", agen$user,"'"),collapse = ","), ")"), " AND 
-                                 fecha_cierre BETWEEN '", paste0(year(now("America/Asuncion")), "-01-01"), "' AND '", as.character(now("America/Asuncion")), "' AND
+                                 fecha BETWEEN '", paste0(year(now("America/Asuncion")), "-01-01"), "' AND '", as.character(now("America/Asuncion")), "' AND
                                  fase > '4' AND tipo IN ('colocación', 'captación') AND 
                                  comision_cobrada > 0"))
 
@@ -3569,7 +3569,7 @@ server <- function(input, output, session){
       
       transa <- list_table_var_mysql(paste0(co, "_transacciones"), "user", vars$office_agen_stat$user)
       transa <- transa %>% filter(!user %in% c("gmayeregger@gmail.com", "daniel.ortiz@skyone.group") &
-                                    fecha_cierre >= input$date_range_office_stat[1] & fecha_cierre <= input$date_range_office_stat[2])
+                                    fecha >= input$date_range_office_stat[1] & fecha <= input$date_range_office_stat[2])
       cambio <- cambio_dolar$venta
       transa <- transa %>% mutate(precio = ifelse(moneda == "GS", round(precio_cierre/cambio), precio_cierre))
       transa <- transa %>% mutate(comision_cobrada = ifelse(moneda == "GS", round(comision_cobrada/cambio), comision_cobrada))
@@ -3578,6 +3578,9 @@ server <- function(input, output, session){
       regalias <- transa %>% mutate(regalias = ifelse(fase > 4 & tipo %in% c("captación", "colocación"), round(comision_cobrada*0.10), 0))
       
       transa <- transa %>% mutate(gross_com = ifelse(fase > 4 & tipo %in% c("captación", "colocación"), comision_cobrada, 0))
+      lore_alfre <- transa %>% filter(user == "dclorenayalfredo@gmail.com")
+      print("lore_alfre")
+      print(lore_alfre)
       vars$user_tot_prod <- transa %>% group_by(user) %>% summarize(tot_gross_com = sum(gross_com)) %>% arrange(desc(tot_gross_com))
       print(vars$user_tot_prod)
       
@@ -4385,8 +4388,7 @@ server <- function(input, output, session){
     gross_com_tot <- data.frame()
     
     if(nrow(transa) != 0){
-      transa <- transa %>% mutate(fecha = as_date(fecha_cierre),
-                                  n = ifelse(moneda == "GS", round(comision_cobrada/cambio), comision_cobrada))
+      transa <- transa %>% mutate(n = ifelse(moneda == "GS", round(comision_cobrada/cambio), comision_cobrada))
       transa <- transa %>% select(fecha, n)
       vars$stat_agen_gross_com <- transa
       vars$stat_agen_cierres <- transa %>% group_by(fecha) %>% summarize(n = n())
@@ -4418,8 +4420,7 @@ server <- function(input, output, session){
     }
     
     if(nrow(venta_total) != 0){
-      venta_total <- venta_total %>% mutate(fecha = as_date(fecha_cierre),
-                                            n = ifelse(moneda == "GS", round(precio_cierre/cambio), precio_cierre))
+      venta_total <- venta_total %>% mutate(n = ifelse(moneda == "GS", round(precio_cierre/cambio), precio_cierre))
       venta_total <- venta_total %>% select(fecha, n)
       vars$stat_agen_venta_total <- venta_total
       
@@ -4440,8 +4441,7 @@ server <- function(input, output, session){
     }
     
     if(nrow(lado_capta) != 0){
-      lado_capta <- lado_capta %>% mutate(fecha = as_date(fecha_cierre),
-                                          n = ifelse(moneda == "GS", round(comision_cobrada/cambio), comision_cobrada))
+      lado_capta <- lado_capta %>% mutate(n = ifelse(moneda == "GS", round(comision_cobrada/cambio), comision_cobrada))
       lado_capta <- lado_capta %>% select(fecha, n)
       vars$stat_agen_lado_capta <- lado_capta %>% group_by(fecha) %>% summarize(n = n())
       lado_capta <- lado_capta %>% mutate(fecha = as_date(paste0(format(fecha, "%Y-%m"), "-01")))
@@ -4461,8 +4461,7 @@ server <- function(input, output, session){
     }
     
     if(nrow(lado_coloc) != 0){
-      lado_coloc <- lado_coloc %>% mutate(fecha = as_date(fecha_cierre),
-                                n = ifelse(moneda == "GS", round(comision_cobrada/cambio), comision_cobrada))
+      lado_coloc <- lado_coloc %>% mutate(n = ifelse(moneda == "GS", round(comision_cobrada/cambio), comision_cobrada))
       lado_coloc <- lado_coloc %>% select(fecha, n)
       vars$stat_agen_lado_coloc <- lado_coloc %>% group_by(fecha) %>% summarize(n = n())
       lado_coloc <- lado_coloc %>% mutate(fecha = as_date(paste0(format(fecha, "%Y-%m"), "-01")))
