@@ -1114,7 +1114,7 @@ brokers <- brokers[!brokers$user %in% c("ana.cazal@skyone.com.py", "gustavo.silv
 oficinas <- load_mysql(paste0(co, "_agencias_data")) %>% select(id, oficina = name)
 brokers <- left_join(brokers, oficinas, by = c("agencia" = "id"))
 
-fecha_pago <- "2025-09"
+fecha_pago <- "2025-10"
 
 for(i in 1:nrow(brokers)){
   ofi <- brokers[i,]
@@ -1149,11 +1149,11 @@ for(i in 1:nrow(brokers)){
 
 #Recarga Place a SkyOne
 sky <- query_mysql("SELECT * FROM myplace_usuarios WHERE company = 'skyone' AND 
-                   agencia = 'agencia_0000000004'" )
+                   agencia = 'agencia_0000000011'" )
 pla <- load_mysql("cuentas2")
 #pla$myplace_date_create[pla$cuenta %in% sky$user] <- as.character(now("America/Asuncion"))
 #pla$myplace_fecha_pago[pla$cuenta %in% sky$user] <- as.character(now("America/Asuncion"))
-pla$myplace_fecha_vencimiento[pla$cuenta %in% sky$user] <- "2025-10-05 23:00:00"
+pla$myplace_fecha_vencimiento[pla$cuenta %in% sky$user] <- "2025-11-05 23:00:00"
 pla$myplace_plan[pla$cuenta %in% sky$user] <- "Plan MyPlace Basic"
 pla$myplace_activo[pla$cuenta %in% sky$user] <- "si"
 pla$myplace_saldo_avaluos[pla$cuenta %in% sky$user] <- 10
@@ -1165,7 +1165,7 @@ save_mysql(pla, "cuentas2", TRUE)
 #Asu set25 01
 #Cpl ago25 06
 #Emp set25 07
-#Hom set25 11
+#Hom oct25 11
 #Nov set25 12
 
 

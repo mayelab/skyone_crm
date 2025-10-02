@@ -17564,15 +17564,24 @@ server <- function(input, output, session){
   })
   
   observeEvent(vars$minube_list_all, {
-    if(nrow(vars$minube_list_all) > 1){
-      print("vars$minube_list_all")
+    req(vars$minube_list_all)
+      print("vars$minube_list_all 2")
       print(isolate(vars$minube_list_all))
       nivel <- min(vars$minube_list_all$Order)
+      print("nivel 2")
+      print(nivel)
       vars$list_folder <- vars$minube_list_all[vars$minube_list_all$Type == "dir" & vars$minube_list_all$Order == nivel + 1,]
-      if(nrow(vars$list_folder) == 0) vars$list_folder <- NA
+      print("vars$list_folder")
+      print(vars$list_folder)
+#      if(nrow(vars$list_folder) == 0) vars$list_folder <- data.frame()
+      print("paso if 1")
       vars$list_file <- vars$minube_list_all[vars$minube_list_all$Type == "file" & vars$minube_list_all$Order == nivel,]
-      if(nrow(vars$list_file) == 0) vars$list_file <- NA
-      if(!is.na(vars$list_folder)){
+#      if(nrow(vars$list_file) == 0) vars$list_file <- data.frame()
+      print("paso if 2")
+      print("vars$list_folder")
+      print(vars$list_folder)
+      if(nrow(vars$list_folder) > 0){
+        print("paso if 3")
         output$folder_buttons_ui <- renderUI({
           buttons_folder <- as.list(1:nrow(vars$list_folder))
           buttons_folder <- lapply(buttons_folder, function(i){
@@ -17626,7 +17635,7 @@ server <- function(input, output, session){
           div()
         })
       }
-      if(!is.na(vars$list_file)){
+      if(nrow(vars$list_file) > 0){
         output$file_buttons_ui <- renderUI({
           buttons_file <- as.list(1:nrow(vars$list_file))
           buttons_file <- lapply(buttons_file, function(i){
@@ -17705,14 +17714,6 @@ server <- function(input, output, session){
           div()
         })
       }
-    }else{
-      output$folder_buttons_ui <- renderUI({
-        div()
-      })
-      output$file_buttons_ui <- renderUI({
-        div()
-      })
-    }
   })
   
   observeEvent(input$minube_file_share_ok, {
